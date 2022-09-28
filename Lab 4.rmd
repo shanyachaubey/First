@@ -1,0 +1,195 @@
+---
+title: "Web Scraping Lab"
+author: "Dr. Osita Onyejekwe"
+date: "09/23/2022"
+output: html_document
+---
+
+# Introduction
+
+During today's Lab, we'll go over an example from class a bit slower so we can understand what the different functions are doing and what each object contains. This introduction section walks through an example, and then in the practice section you will be asked to replicate this example on your own.
+
+### 1) Loading webpage
+
+In the code below, we identify the webpage that we want to scrape by its URL. 
+```{r}
+# Wikipedia article to scrape
+
+url <- "https://en.wikipedia.org/w/index.php?title=2009_swine_flu_pandemic_tables&oldid=950511922"
+
+# If you are unable to access Wikipedia, uncomment and use the following
+# line to read in the saved HTML file of the webpage
+# url = "h1n1_wiki_tables.html"
+
+```
+
+
+### 2) Extract all tables in the page
+
+In this code chunk, we first load the R libraries required for webscraping ```rvest``` and the ```tidyverse``` for general data manipulation. Then we transfer the raw webscraping results into useable dataframes. The first step is to tell R to read in the raw webpage (it will store this as text); then tell R to identify the tables from the raw webpage and store them as dataframes. 
+
+```{r, message = FALSE , warning=FALSE}
+library(tidyverse)
+library(rvest)
+
+tab = read_html(url) %>% html_nodes("table") #read webpage, then identify tables 
+tab
+
+cases_df <- tab %>% .[1] %>% html_table %>% .[[1]]
+deaths_df <- tab %>% .[2] %>% html_table %>% .[[1]]
+
+
+```
+
+### 3) Variable names to use for the table of case counts
+
+Next, we need to name the columns of our dataframe so that we can access them later. We will hard code the same names that are on the Wikipedia page. 
+
+```{r}
+case_names <- c("by_date", "by_continent", "country", "first_case",
+                "April", "May", "June", "July", "August", "latest")
+
+```
+
+### 4) Variable names to use for the table of death counts
+
+Do the same for the other table.
+
+```{r}
+death_names <- c("by_date", "by_continent", "country", "first_death",
+                 "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+```
+
+### 5) Assign column names
+
+Now that we have vectors containing the names we would like to assign to each column we tell R to set the column names in the dataframes.
+
+```{r}
+
+cases_df <- tab %>% .[1] %>% html_table %>% .[[1]] %>% setNames(case_names)
+
+
+deaths_df <- tab %>% .[2] %>% html_table %>% .[[1]] %>% setNames(death_names)
+cases_df
+```
+
+# Practice
+
+Now let's give it a try ourselves. Let's try to scrape the table with the human development index from the following Wikipedia page:
+
+https://en.wikipedia.org/wiki/List_of_countries_by_Human_Development_Index
+
+Some resources on web scraping with R:
+
+https://www.analyticsvidhya.com/blog/2017/03/beginners-guide-on-web-scraping-in-r-using-rvest-with-hands-on-knowledge/
+
+https://www.youtube.com/watch?v=4IYfYx4yoAI
+
+
+### Question 1) Load the URL
+
+```{r}
+#install.packages('rvest')
+library(rvest)
+url <- "https://en.wikipedia.org/w/index.php?title=List_of_countries_by_Human_Development_Index&oldid=1043741772"
+
+# If you are unable to access Wikipedia, uncomment and use the following
+# line to read in the saved HTML file of the webpage
+# url = "hdi_wiki_list.html"
+
+```
+
+### Question 2) Load required libraries and extract tables from the webpage
+
+```{r }
+library(tidyverse)
+library(rvest)
+library(lubridate)
+
+tab = read_html(url) %>% html_nodes("table")
+tab
+```
+
+
+```{r }
+hdi <- tab %>% .[1] %>% html_table(fill=TRUE) %>% .[[1]]
+str(hdi)
+```
+
+* How many columns does our table include? Do we need all of them? Select only the ones that we need.
+
+```{r }
+new_hdi <- hdi %>% select(-1,-2 ,-5) %>% filter(Nation != "Nation") 
+new_hdi
+            
+
+```
+
+### 3) Assign column names
+
+```{r }
+col_names <- c("country", "HDI" )
+
+new_hdi <- hdi %>% select(-1,-2 ,-5) %>% filter(Nation != "Nation") %>% setNames(col_names)
+new_hdi
+```
+
+### 4) Join with GDP table.
+
+Now we can go one step further. Let's join the table we just created with a table that includes gdp per capita by country for the last year that it's available, which is 2011. What will we join by? What type of join function is most appropriate?
+
+```{r}
+#install.packages("dslabs")
+library(dslabs)
+head(gapminder)
+
+# your code here
+
+join_data<- left_join(gapminder, new_hdi, by = "country")
+```
+
+
+# Looking Ahead
+
+Let's use the table we scraped earlier as an example (the `cases_df` data frame) with the date of the first swine flu case in each country.
+
+
+Calling the `str()` function, we can see that the column for the date of the first case is a string, which means that R understands the contents as a set of characters and not as a date. So if we try to order our data frame by the date of the first case, R won't do a good job.
+
+But we can use the function ymd() to convert into a date. Then we can use the converted date column to arrange our data frame according to the date of the first case.
+
+
+```{r}
+str(cases_df)
+
+```
+
+
+### 1) Convert the `first_case` column to a date and arrange the data frame by the `first_case` date.
+
+```{r}
+
+cases_df$first_case <- ymd(cases_df$first_case)
+
+cases_df %>% arrange(first_case)
+
+
+```
+
+### 2) Calculate the time difference between each country's first case and the previous country's first case using the `lag()` function, and save it into a column called `first_case_diff`.
+
+```{r, message= FALSE, warning= FALSE}
+#install.packages("lubridate")
+library(lubridate)
+cases_df$first_case_diff <- cases_df$first_case - lag(cases_df$first_case) 
+head(cases_df)
+
+
+```
+
+
+
+
+
+

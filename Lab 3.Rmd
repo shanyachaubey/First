@@ -1,0 +1,263 @@
+---
+title: 'Lab 3: ggplot2 and Visualization Principles '
+author: "Dr. Osita Onyejekwe"
+date: "09/16/2022"
+output: html_document
+---
+
+
+In May 2020, the [Georgia Department of Public Health](https://dph.georgia.gov/covid-19-daily-status-report) posted the following plot to illustrate the number of confirmed COVID-19 cases in their hardest-hit counties over a two-week period. 
+
+
+![Geogia County Covid Cases.](georgia_dph_bad.png)
+
+
+The plot was heavily criticized by the statistical community and several media outlets for its deceptive portrayal of COVID-19 trends in Georgia. Whether the end result was due to malicious intent or simply poor judgment, it is caused controversy as some believed that this graph was misleading in that it showed COVID-19 trends as decreasing. 
+
+In this lab, we will pretend that we are data scientists tasked with the job of making better COVID-19 visualizations. This will also give us an opportunity to practice making more aesthetically pleasing plots using the `ggplot2` package. For the remainder of the course, you will be expected to use `ggplot2` any time you create a plot.
+
+We will use the [*New York Times* COVID-19 data](https://github.com/nytimes/covid-19-data) to get county-level information for Georgia. The numbers look slightly different from the ones reported by the Georgia DPH, but that's okay for our purposes. The code below reads in the the data through September 30, 2020 that is saved in the `us-counties.csv` file in the lab folder. If you would like to pull the most up-to-date version of the data, you can replace `read_csv("us-counties.csv")` with `read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv")` in the code below. 
+
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+# Replace "us-counties.csv" with 
+# "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv"
+# to pull most up-to-date version from Github
+us_counties = read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv")
+head(us_counties)
+```
+
+This lab (particularly questions 10 and 11) borrows ideas and code from Peter Ellis's [blog post](http://freerangestats.info/blog/2020/05/23/ordering-in-bar-charts). 
+
+
+
+1. Create a new data frame called `georgia_counties` that only contains the data from Georgia. Add a new variable called `new_cases` that stores the number of new confirmed cases for each day at the county level. Hint: the `lag` function returns the previous values in a vector. You will use the following functions. `%>%`, `filter` , `group_by`,
+`mutate` , `arrange`, `lag(cases)` and `ungroup`
+
+```{r}
+
+georgia_counties <- us_counties %>%
+  filter(state == "Georgia") %>%
+  group_by(county) %>%
+  arrange(date) %>%
+  mutate(new_cases = cases - lag(cases)) %>%
+  ungroup()
+
+  
+
+head(georgia_counties)
+
+```
+
+
+2. For the date May 09, 2020, You want to get a sense of that date's distribution of the total number of confirmed cases in each county in Georgia. Make three histograms, one with 10 black bins, one with 30 red bins, and one with 50 blue bins. Include nice axis labels and titles. Use the `grid.arrange` function from the `gridExtra` package to place the three plots next to each other. 
+
+```{r}
+
+hist1 <- georgia_counties %>% filter(date == "2020-05-09") %>% ggplot(aes(x = cases)) +
+  geom_histogram(bins = 10,fill = "black")+
+  ggtitle("10 bins")+
+  xlab("No. of cases")+
+  ylab("Frequency")
+  
+hist1
+```
+
+
+Then, we want to create and save the three histograms. The `bins` argument controls the number of bins and the `fill` argument determines what color to fill them in. We can also specify better titles using `ggtitle`, `xlab`, and `ylab`. 
+
+```{r}
+hist2 <- georgia_counties %>% filter(date == "2020-05-09") %>% ggplot(aes(x = cases)) +
+  geom_histogram(bins = 30,fill = "red")+
+  ggtitle("30 bins")+
+  xlab("No. of cases")+
+  ylab("Frequency")
+  
+hist2
+
+hist3 <- georgia_counties %>% filter(date == "2020-05-09") %>% ggplot(aes(x = cases)) +
+  geom_histogram(bins = 50,fill = "blue")+
+  ggtitle("50 bins")+
+  xlab("No. of cases")+
+  ylab("Frequency")
+  
+hist3
+
+
+```
+
+
+
+```{r}
+
+# now use gridarrange to put them all together :) 
+grid.arrange(hist1, hist2, hist3, nrow = 2)
+
+
+```
+
+3. A single day doesn't tell the whole story, so you decide to look at the data from the two weeks, April 26 to May 9, 2020. Boxplots can be easier to interpret than histograms when you are comparing the distributions of multiple groups. Draw boxplots of the total number of confirmed cases in each county by date. Try this with and without a log (base 10) transformation.
+
+
+Make a data frame that stores only the data from April 26 to May 9, 2020. 
+
+```{r}
+
+two_week_data <- georgia_counties %>% filter(date>=as.Date("2020-04-26") & date<=as.Date("2020-05-09"))
+
+
+
+```
+
+Here are the boxplots without transforming the data. 
+
+```{r}
+box1 <- two_week_data %>%
+  ggplot(aes(group = date, date, cases, fill = date))+geom_boxplot()+
+  theme(legend.position = "none")
+  
+  
+box1
+
+
+```
+
+Here are the boxplots after applying a log transform. 
+
+```{r}
+box2 <- two_week_data %>%
+  ggplot(aes(group = date, date, cases, fill = date))+geom_boxplot()+scale_y_continuous(trans = "log10")+
+  theme(legend.position = "none")
+
+  
+box2
+
+
+```
+
+
+
+4. From your plots in Questions 2 and 3, it is clear that there are some counties with a lot of cases! It might be useful to study them more closely. Identify the five most impacted counties, which we will take to be the counties with the highest case totals on May 9, 2020. 
+
+The `slice_max` function is a nifty way to pull out the five rows of `georgia_counties_may9` with the most cases. 
+
+```{r}
+georgia_counties_may9 <- georgia_counties %>% filter(date <= "2020-05-09")%>% group_by(county) %>% summarize(total = sum(cases)) %>% slice_max(order_by = total, n=5)
+
+head(georgia_counties_may9)
+#slice_georgia_counties_may9 <- slice_max(georgia_counties_may9, order_by = cases, n=5)
+#head(slice_georgia_counties_may9)
+
+
+```
+
+
+5. Make an improved clustered barplot of the new cases reported in the 5 most impacted counties between April 26 and May 9. Be sure to order the dates chronologically on the x-axis and maintain the order of the counties within each day's cluster of bars. Does your impression of the COVID-19 situation in Georgia change? 
+
+Let's subset the data to only include observations from the top five counties during the last two weeks. Use the `filer` function. 
+
+```{r}
+data_subset <- two_week_data %>% filter(county %in% georgia_counties_may9$county)
+```
+
+Setting `position = position_dodge()` and specifying the barplot group to be `county` gets us the clusters. By default, `ggplot2` orders the dates chronologically and maintains the order of the counties in the clusters. Note that we can specify the legend title to be "County" (or anything else we want) using `scale_fill_discrete(name = "County")`. 
+
+```{r}
+
+cluster_bar <- data_subset %>% ggplot(aes(x = date, y = new_cases, fill = county))+
+  geom_col(position = position_dodge())+
+  scale_fill_discrete(name = "County")
+cluster_bar
+
+```
+
+
+6. While much improved, the clustered barplot still makes it difficult to compare trends over time in the five counties. Present the data as a line plot with the date on the x-axis, the number of new cases on the y-axis, and each county plotted as a separate line. 
+
+
+```{r}
+
+line_plot <- data_subset %>% ggplot(aes(x = date, y = new_cases, group = county))+ geom_line(aes(color = county))
+line_plot
+
+```
+
+
+
+7. Several months have passed and it is now the most recent date. Update your plot from Question 6 so that it includes all of the data from the start of the pandemic until the most recent date in your data set. 
+
+```{r}
+
+line_plot_new <- georgia_counties %>% filter(county %in% georgia_counties_may9$county) %>% ggplot(aes(x = date, y = new_cases))+ geom_line()+ ylim(0,10000)
+line_plot_new
+
+```
+
+
+8. Unfortunately, because you have so much more data now, it is difficult to see the separate lines in your plot from Question 7 and draw conclusions. Try plotting all of the lines in gray and adding a black line representing the average number of new cases across the five counties. 
+
+```{r}
+
+average_data <- georgia_counties %>% filter(county %in% georgia_counties_may9$county) %>% group_by(date) %>% summarize(average = mean(new_cases))
+
+
+
+
+
+
+```
+
+Setting `aes(group = county)` in the first `geom_line` call ensures that a different gray line is plotted for each county. `georgia5_all_avg` does not have a `county` variable/grouping, which is why we didn't want to pass `group = county` into the `aes` in the top call to `ggplot`. We can add the black average line by passing `georgia5_all_avg` into another call to `geom_line`. 
+
+```{r}
+
+line_plot_new <- ggplot(georgia_counties, aes(x = date, y = new_cases))+ 
+  geom_line(aes(group = county), color = "Grey")+ 
+  ylim(0,10000) +
+  geom_line(data=average_data, mapping = aes(date, average), color = "Black")
+
+line_plot_new
+
+```
+
+9. The line plot from Question 8 is a lot easier on the eyes, but it doesn't resolve the issue that we are unable to visually compare the five counties. Try making a scatterplot of the data, with slightly transparent points colored by county. Then, add a loess line for each county that smooths over local points (advanced). This will help you track the general trends in each county, instead of being distracted by all of the day-to-day variability. 
+
+
+The `alpha` argument controls the transparency of the points, with 1 being completely opaque and 0 being completely transparent. We can add loess lines using the `geom_smooth` function with `method` set to `"loess"`. `se = FALSE` prevents the function from plotting the standard errors, which may be useful for other scenarios but would over-complicate an already busy plot here. The `span` argument controls the amount of smoothing. 
+
+```{r}
+
+
+georgia_counties %>% filter(county %in% georgia_counties_may9$county) %>%
+  ggplot(aes(date, new_cases))+
+  geom_point(aes(color = county),alpha = 0.7)+
+  geom_point(data = average_data, aes(x = date, y = average), color = "Black") + 
+  geom_smooth(aes(color=county), method = "loess", se = FALSE, span = 0.6)
+
+
+```
+
+
+10. Instead of putting all of the points and loess lines in a single plot, make a multi-panel plot with a panel for each country using `facet_wrap`. 
+
+Note that `theme(legend.position = "none")` removes the legend. 
+
+```{r}
+
+georgia_counties %>% filter(county %in% georgia_counties_may9$county) %>%
+  ggplot(aes(date, new_cases))+
+  geom_point(alpha = 0.7)+
+  geom_point(data = average_data, aes(x = date, y = average), color = "Black") + 
+  geom_smooth(aes(color=county), method = "loess", se = FALSE, span = 0.6)+
+  facet_wrap(~county, ncol = 3)+
+  theme(legend.position = "none")
+
+
+
+```
+
+
+
